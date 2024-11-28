@@ -40,7 +40,19 @@ fn unboxing(input: String, output: String) -> anyhow::Result<()> {
 
     let image = album_image(&mut input_file)?;
 
-    let output = output.join(format!("{}.{}", &meta.music_name, &meta.format));
+    let artist = &meta.artist
+        .iter()
+        .map(|item| item.get(0))
+        .filter(Option::is_some)
+        .map(Option::unwrap)
+        .map(Value::as_str)
+        .filter(Option::is_some)
+        .map(Option::unwrap)
+        .map(String::from)
+        .collect::<Vec<String>>()
+        .join(",");
+
+    let output = output.join(format!("{} - {}.{}", &meta.music_name, artist, &meta.format));
 
     let mut output_file = File::create(&output)?;
 
@@ -106,7 +118,7 @@ fn meta_data(file: &mut File) -> anyhow::Result<Meta> {
 
     let temp = buffer[22..].to_vec();
 
-    let temp = base64::prelude::BASE64_STANDARD_NO_PAD.decode(&temp)?;
+    let temp = base64::prelude::BASE64_STANDARD.decode(&temp)?;
 
     let temp = aes_decode(temp.clone(), META_KEY)?;
 
@@ -212,8 +224,6 @@ const META_KEY: [u8; 16] = [
 fn aes_decode(mut ciphertext: Vec<u8>, key: [u8; 16]) -> Result<Vec<u8>, BlockModeError> {
     let cipher = Aes128Ecb::new_from_slices(&key, &[]).unwrap();
 
-    let mut decrypted = vec![0u8; ciphertext.len()];
-
     return cipher
         .decrypt(ciphertext.as_mut_slice())
         .map(|x| x.to_vec());
@@ -268,7 +278,7 @@ fn album_image_mime_type(album_image: &Vec<u8>) -> MimeType {
     }
 
     for i in 0..8 {
-        if (album_image[i] != png[i]) {
+        if album_image[i] != png[i] {
             return MimeType::Jpeg;
         }
     }
